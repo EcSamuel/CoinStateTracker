@@ -1,0 +1,180 @@
+{% comment %}No custom template tags needed anymore{% endcomment %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Krark and Sakashima Board State Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .results-container {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .probability-container {
+            background-color: #fff0f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .heads {
+            color: green;
+            font-weight: bold;
+        }
+        .tails {
+            color: red;
+        }
+        .highlight {
+            background-color: #ffffcc;
+        }
+        .stats-summary {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .stat-box {
+            flex: 1;
+            padding: 10px;
+            margin: 5px;
+            background-color: #e6e6fa;
+            border-radius: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Krark and Sakashima Deck Helper</h1>
+
+    <div class="form-container">
+        <h2>Board State Setup</h2>
+        <form method="post">
+            {% csrf_token %}
+            <table>
+                {% for field in form %}
+                    <tr>
+                        <td>{{ field.label_tag }}</td>
+                        <td>{{ field }}</td>
+                        <td><small>{{ field.help_text }}</small></td>
+                    </tr>
+                {% endfor %}
+            </table>
+            <button type="submit">Simulate Flips</button>
+        </form>
+    </div>
+
+    {% if total_triggers %}
+        <div class="probability-container">
+            <h2>Probability Analysis</h2>
+            <div class="stats-summary">
+                <div class="stat-box">
+                    <h3>Total Triggers</h3>
+                    <p>{{ total_triggers }}</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Bust Chance</h3>
+                    <p>{{ probabilities.bust_probability|floatformat:4 }} ({% widthratio probabilities.bust_probability 1 100 %}%)</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Expected Copies</h3>
+                    <p>{{ probabilities.expected_copies|floatformat:2 }}</p>
+                </div>
+            </div>
+
+            <h3>Distribution of Heads</h3>
+            <table>
+                <tr>
+                    <th>Heads</th>
+                    <th>Probability</th>
+                    <th>Percentage</th>
+                </tr>
+                {% for heads, prob in probabilities.heads_distribution.items %}
+                <tr>
+                    <td>{{ heads }}</td>
+                    <td>{{ prob|floatformat:6 }}</td>
+                    <td>{% widthratio prob 1 100 %}%</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    {% endif %}
+
+    {% if simulation_results %}
+        <div class="results-container">
+            <h2>Simulation Results</h2>
+
+            {% for result in simulation_results %}
+                <h3>Simulation #{{ forloop.counter }}</h3>
+                <div class="stats-summary">
+                    <div class="stat-box">
+                        <h4>Heads</h4>
+                        <p class="heads">{{ result.heads_count }}</p>
+                    </div>
+                    <div class="stat-box">
+                        <h4>Tails</h4>
+                        <p class="tails">{{ result.tails_count }}</p>
+                    </div>
+                    <div class="stat-box">
+                        <h4>Copies Created</h4>
+                        <p>{{ result.copy_count }}</p>
+                    </div>
+                    <div class="stat-box">
+                        <h4>Status</h4>
+                        <p {% if result.all_tails %}class="highlight"{% endif %}>
+                            {% if result.all_tails %}BUST!{% else %}Success{% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <table>
+                    <tr>
+                        <th>#</th>
+                        <th>Flip Details</th>
+                        <th>Result</th>
+                    </tr>
+                    {% for flip in result.flip_results %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            {% for f in flip.flips %}
+                                <span class="{% if f == 'heads' %}heads{% else %}tails{% endif %}">{{ f }}</span>
+                                {% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </td>
+                        <td class="{% if flip.result == 'heads' %}heads{% else %}tails{% endif %}">
+                            {{ flip.result }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            {% endfor %}
+        </div>
+    {% endif %}
+</body>
+</html>
