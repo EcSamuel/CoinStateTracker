@@ -1,0 +1,36 @@
+{% comment %}This is a partial template that contains only the probability section{% endcomment %}
+<div class="probability-container">
+    <h2>Probability Analysis</h2>
+    <div class="stats-summary">
+        <div class="stat-box">
+            <h3>Total Triggers</h3>
+            <p>{{ total_triggers }}</p>
+        </div>
+        <div class="stat-box">
+            <h3>Bust Chance</h3>
+            <p>{{ probabilities.bust_probability|floatformat:4 }} ({% widthratio probabilities.bust_probability 1 100 %}%)</p>
+        </div>
+        <div class="stat-box">
+            <h3>Expected Copies</h3>
+            <p>{{ probabilities.expected_copies|floatformat:2 }}</p>
+        </div>
+    </div>
+
+    <details>
+        <summary>Distribution of Heads</summary>
+        <table>
+            <tr>
+                <th>Heads</th>
+                <th>Probability</th>
+                <th>Percentage</th>
+            </tr>
+            {% for heads, prob in probabilities.heads_distribution.items %}
+            <tr>
+                <td>{{ heads }}</td>
+                <td>{{ prob|floatformat:6 }}</td>
+                <td>{% widthratio prob 1 100 %}%</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </details>
+</div>

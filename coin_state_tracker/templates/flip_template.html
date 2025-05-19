@@ -28,6 +28,12 @@
             border-radius: 8px;
             margin-bottom: 20px;
         }
+        .summary-container {
+            background-color: #f0fff0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -58,14 +64,59 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
         .stat-box {
             flex: 1;
+            min-width: 150px;
             padding: 10px;
             margin: 5px;
             background-color: #e6e6fa;
             border-radius: 5px;
             text-align: center;
+        }
+        details {
+            background-color: #f8f8f8;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            padding: 5px;
+        }
+        details > div {
+            padding: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        /* Loader styles */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+            margin-left: 10px;
+            vertical-align: middle;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -74,7 +125,7 @@
 
     <div class="form-container">
         <h2>Board State Setup</h2>
-        <form method="post">
+        <form method="post" id="boardStateForm">
             {% csrf_token %}
             <table>
                 {% for field in form %}
@@ -85,43 +136,47 @@
                     </tr>
                 {% endfor %}
             </table>
-            <button type="submit">Simulate Flips</button>
+            <div class="button-group">
+                <button type="button" id="updateProbButton">Calculate Probabilities</button>
+                <button type="submit">Simulate Flips</button>
+                <span class="loader" id="probLoader"></span>
+            </div>
         </form>
     </div>
 
-    {% if total_triggers %}
-        <div class="probability-container">
-            <h2>Probability Analysis</h2>
+    <div id="probabilitySection">
+        {% include "probability.html" %}
+    </div>
+
+    {% if show_simulations and summary_stats %}
+        <div class="summary-container">
+            <h2>Simulation Summary</h2>
             <div class="stats-summary">
                 <div class="stat-box">
-                    <h3>Total Triggers</h3>
-                    <p>{{ total_triggers }}</p>
+                    <h3>Wins</h3>
+                    <p class="heads">{{ summary_stats.wins }}</p>
                 </div>
                 <div class="stat-box">
-                    <h3>Bust Chance</h3>
-                    <p>{{ probabilities.bust_probability|floatformat:4 }} ({% widthratio probabilities.bust_probability 1 100 %}%)</p>
+                    <h3>Losses</h3>
+                    <p class="tails">{{ summary_stats.losses }}</p>
                 </div>
                 <div class="stat-box">
-                    <h3>Expected Copies</h3>
-                    <p>{{ probabilities.expected_copies|floatformat:2 }}</p>
+                    <h3>Win Rate</h3>
+                    <p>{% widthratio summary_stats.win_rate 1 100 %}%</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Avg. Heads</h3>
+                    <p class="heads">{{ summary_stats.avg_heads|floatformat:2 }}</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Avg. Tails</h3>
+                    <p class="tails">{{ summary_stats.avg_tails|floatformat:2 }}</p>
+                </div>
+                <div class="stat-box">
+                    <h3>Avg. Copies</h3>
+                    <p>{{ summary_stats.avg_copies|floatformat:2 }}</p>
                 </div>
             </div>
-
-            <h3>Distribution of Heads</h3>
-            <table>
-                <tr>
-                    <th>Heads</th>
-                    <th>Probability</th>
-                    <th>Percentage</th>
-                </tr>
-                {% for heads, prob in probabilities.heads_distribution.items %}
-                <tr>
-                    <td>{{ heads }}</td>
-                    <td>{{ prob|floatformat:6 }}</td>
-                    <td>{% widthratio prob 1 100 %}%</td>
-                </tr>
-                {% endfor %}
-            </table>
         </div>
     {% endif %}
 
@@ -129,52 +184,98 @@
         <div class="results-container">
             <h2>Simulation Results</h2>
 
-            {% for result in simulation_results %}
-                <h3>Simulation #{{ forloop.counter }}</h3>
-                <div class="stats-summary">
-                    <div class="stat-box">
-                        <h4>Heads</h4>
-                        <p class="heads">{{ result.heads_count }}</p>
-                    </div>
-                    <div class="stat-box">
-                        <h4>Tails</h4>
-                        <p class="tails">{{ result.tails_count }}</p>
-                    </div>
-                    <div class="stat-box">
-                        <h4>Copies Created</h4>
-                        <p>{{ result.copy_count }}</p>
-                    </div>
-                    <div class="stat-box">
-                        <h4>Status</h4>
-                        <p {% if result.all_tails %}class="highlight"{% endif %}>
-                            {% if result.all_tails %}BUST!{% else %}Success{% endif %}
-                        </p>
-                    </div>
-                </div>
-
-                <table>
-                    <tr>
-                        <th>#</th>
-                        <th>Flip Details</th>
-                        <th>Result</th>
-                    </tr>
-                    {% for flip in result.flip_results %}
-                    <tr>
-                        <td>{{ forloop.counter }}</td>
-                        <td>
-                            {% for f in flip.flips %}
-                                <span class="{% if f == 'heads' %}heads{% else %}tails{% endif %}">{{ f }}</span>
-                                {% if not forloop.last %}, {% endif %}
-                            {% endfor %}
-                        </td>
-                        <td class="{% if flip.result == 'heads' %}heads{% else %}tails{% endif %}">
-                            {{ flip.result }}
-                        </td>
-                    </tr>
+            <details>
+                <summary>Show Detailed Simulation Results ({{ simulation_results|length }} simulations)</summary>
+                <div>
+                    {% for result in simulation_results %}
+                        <details>
+                            <summary>
+                                Simulation #{{ forloop.counter }} -
+                                Heads: <span class="heads">{{ result.heads_count }}</span>,
+                                Tails: <span class="tails">{{ result.tails_count }}</span>,
+                                Copies: {{ result.copy_count }}
+                                {% if result.all_tails %}<span class="highlight"> - BUST!</span>{% endif %}
+                            </summary>
+                            <div>
+                                <table>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Flip Details</th>
+                                        <th>Result</th>
+                                    </tr>
+                                    {% for flip in result.flip_results %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            {% for f in flip.flips %}
+                                                <span class="{% if f == 'heads' %}heads{% else %}tails{% endif %}">{{ f }}</span>
+                                                {% if not forloop.last %}, {% endif %}
+                                            {% endfor %}
+                                        </td>
+                                        <td class="{% if flip.result == 'heads' %}heads{% else %}tails{% endif %}">
+                                            {{ flip.result }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </details>
                     {% endfor %}
-                </table>
-            {% endfor %}
+                </div>
+            </details>
         </div>
     {% endif %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // JavaScript for real-time probability updates
+            const updateProbButton = document.getElementById('updateProbButton');
+            const probLoader = document.getElementById('probLoader');
+            const boardStateForm = document.getElementById('boardStateForm');
+            const probabilitySection = document.getElementById('probabilitySection');
+
+            updateProbButton.addEventListener('click', function() {
+                // Show loader
+                probLoader.style.display = 'inline-block';
+
+                // Get form data
+                const formData = new FormData(boardStateForm);
+                formData.append('calc_prob', 'true');
+
+                // Send AJAX request
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Update the probability section with new HTML
+                    probabilitySection.innerHTML = data.probability_html;
+
+                    // Hide loader
+                    probLoader.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Hide loader
+                    probLoader.style.display = 'none';
+                });
+            });
+
+            // Auto update probabilities when form fields change
+            const formInputs = boardStateForm.querySelectorAll('input, select');
+            formInputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    // Don't auto-update on num_simulations change to avoid confusion
+                    if (input.id !== 'id_num_simulations') {
+                        updateProbButton.click();
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
